@@ -1,0 +1,88 @@
+name: CI with Nx Cloud
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  main:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: "yarn"
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+
+      # Set up Nx SHAs for affected command
+      - name: Set Nx SHAs
+        uses: nrwl/nx-set-shas@v4
+
+      # Start Nx Cloud CI run (optional - requires Nx Cloud setup)
+      - name: Start CI run
+        run: npx nx-cloud start-ci-run --stop-agents-after="build" --agent-count=3
+        continue-on-error: true
+
+      # Run affected commands with better error handling
+      - name: Run affected lint
+        run: npx nx affected -t lint --parallel=3
+        continue-on-error: false
+
+      - name: Run affected tests
+        run: npx nx affected -t test --parallel=3 --ci --coverage --watchAll=false
+        continue-on-error: false
+
+      - name: Run affected builds
+        run: npx nx affected -t build --parallel=3
+
+      # Generate and upload coverage reports (if using vitest with coverage)
+      - name: Upload coverage reports to Codecov
+        if: success()
+        uses: codecov/codecov-action@v4
+        with:
+          directory: ./coverage
+          fail_ci_if_error: false
+        continue-on-error: true
+
+      # Upload build artifacts
+      - name: Upload build artifacts
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts-${{ github.sha }}
+          path: |
+            apps/demo-app/dist/
+            .nx/cache/
+          retention-days: 7
+
+      # Show final build stats
+      - name: Build Summary
+        if: always()
+        run: |
+          echo "## Build Summary 📊" >> $GITHUB_STEP_SUMMARY
+          echo "- Node.js: $(node --version)" >> $GITHUB_STEP_SUMMARY
+          echo "- Yarn: $(yarn --version)" >> $GITHUB_STEP_SUMMARY
+          echo "- Nx: $(npx nx --version)" >> $GITHUB_STEP_SUMMARY
+          if [ -d "apps/demo-app/dist" ]; then
+            echo "- Build size: $(du -sh apps/demo-app/dist | cut -f1)" >> $GITHUB_STEP_SUMMARY
+            echo "- Asset files: $(find apps/demo-app/dist/assets -type f | wc -l)" >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Nx workspace cleanup
+        run: npx nx fix-ci
+        if: always()
+
