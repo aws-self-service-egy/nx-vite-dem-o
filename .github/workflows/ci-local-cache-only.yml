@@ -1,10 +1,10 @@
 name: CI - Local Cache Only (No Nx Cloud)
 
 on:
-  workflow_dispatch: # Manual trigger for testing
   push:
     branches:
-      - feature/local-cache-demo  # Separate branch for testing
+      - feature/local-cache-demo
+  workflow_dispatch:
 
 permissions:
   actions: read
@@ -37,7 +37,7 @@ jobs:
             nx-local-${{ runner.os }}-${{ hashFiles('nx.json') }}-
             nx-local-${{ runner.os }}-
 
-      - name: Cache Vite Dependencies  
+      - name: Cache Vite Dependencies
         uses: actions/cache@v4
         with:
           path: |
@@ -81,7 +81,7 @@ jobs:
         env:
           NX_CLOUD_ACCESS_TOKEN: ""
 
-      - name: Run affected builds (Local Cache) 
+      - name: Run affected builds (Local Cache)
         run: npx nx affected -t build --parallel=3 --skip-nx-cloud
         env:
           NX_CLOUD_ACCESS_TOKEN: ""
@@ -92,13 +92,13 @@ jobs:
         run: |
           echo "## 🔧 Local Nx + GitHub Actions Cache Demo"
           echo "Testing pure local caching behavior..."
-          
+
           echo "=== First build (potential cache hit from GitHub Actions) ==="
           time npx nx build demo-app --skip-nx-cloud
-          
+
           echo "=== Second build (should hit local Nx cache) ==="
           time npx nx build demo-app --skip-nx-cloud
-          
+
           echo "=== Third build (should be instant local cache) ==="
           time npx nx build demo-app --skip-nx-cloud
         env:
@@ -110,7 +110,7 @@ jobs:
         run: |
           echo "### 📊 Cache Statistics" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          
+
           if [ -d ".nx/cache" ]; then
             echo "**Nx Local Cache:**" >> $GITHUB_STEP_SUMMARY
             echo "- Size: $(du -sh .nx/cache | cut -f1)" >> $GITHUB_STEP_SUMMARY
@@ -118,20 +118,20 @@ jobs:
           else
             echo "**Nx Local Cache:** Not found" >> $GITHUB_STEP_SUMMARY
           fi
-          
+
           if [ -d "node_modules/.vite" ]; then
-            echo "**Vite Cache:**" >> $GITHUB_STEP_SUMMARY  
+            echo "**Vite Cache:**" >> $GITHUB_STEP_SUMMARY
             echo "- Size: $(du -sh node_modules/.vite | cut -f1)" >> $GITHUB_STEP_SUMMARY
           else
             echo "**Vite Cache:** Not found" >> $GITHUB_STEP_SUMMARY
           fi
-          
+
           if [ -d "apps/demo-app/dist" ]; then
             echo "**Build Output:**" >> $GITHUB_STEP_SUMMARY
             echo "- Size: $(du -sh apps/demo-app/dist | cut -f1)" >> $GITHUB_STEP_SUMMARY
             echo "- Assets: $(find apps/demo-app/dist/assets -type f 2>/dev/null | wc -l)" >> $GITHUB_STEP_SUMMARY
           fi
-          
+
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### 🏗️ Caching Strategy" >> $GITHUB_STEP_SUMMARY
           echo "This workflow uses **only local caching**:" >> $GITHUB_STEP_SUMMARY
