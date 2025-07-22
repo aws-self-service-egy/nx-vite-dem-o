@@ -42,6 +42,18 @@ export default defineConfig({
   
   // Define for environment variables
   define: {
-    'process.env.NODE_ENV': JSON.stringify(import.meta.env.MODE || 'development')
+    'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV || 'development')
+  },
+
+  // Test configuration
+  test: {
+    globals: true,
+    environment: 'jsdom',
+    include: ['src/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}'],
+    reporters: ['default'],
+    coverage: {
+      reportsDirectory: '../../coverage/apps/demo-app',
+      provider: 'v8'
+    }
   }
 })
