@@ -1,10 +1,10 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
-import { resolve } from 'path'
+import { fileURLToPath, URL } from 'url'
 
 // https://vitejs.dev/config/
 export default defineConfig({
-  root: __dirname,
+  root: fileURLToPath(new URL('.', import.meta.url)),
   cacheDir: '../../node_modules/.vite/demo-app',
   plugins: [react()],
   
@@ -43,5 +43,17 @@ export default defineConfig({
   // Define for environment variables
   define: {
     'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV || 'development')
+  },
+
+  // Test configuration
+  test: {
+    globals: true,
+    environment: 'jsdom',
+    include: ['src/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}'],
+    reporters: ['default'],
+    coverage: {
+      reportsDirectory: '../../coverage/apps/demo-app',
+      provider: 'v8'
+    }
   }
 })

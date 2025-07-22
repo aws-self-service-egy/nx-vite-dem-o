@@ -1,0 +1,114 @@
+name: CI with Nx Cloud
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  main:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: "yarn"
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+
+      # Cache Vite build dependencies (complementary to Nx Cloud)
+      - name: Cache Vite Build Dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            node_modules/.vite
+            node_modules/.cache/esbuild
+            .nx/cache
+            apps/demo-app/node_modules/.vite
+          key: vite-deps-${{ runner.os }}-${{ hashFiles('**/vite.config.*') }}-${{ hashFiles('**/package.json') }}
+          restore-keys: |
+            vite-deps-${{ runner.os }}-${{ hashFiles('**/vite.config.*') }}-
+            vite-deps-${{ runner.os }}-
+
+      # Set up Nx SHAs for affected command
+      - name: Set Nx SHAs
+        uses: nrwl/nx-set-shas@v4
+
+      # Run affected commands with Nx Cloud
+      - name: Run affected lint
+        run: npx nx affected -t lint --parallel=3
+        env:
+          NX_CLOUD_ACCESS_TOKEN: ${{ secrets.NX_CLOUD_ACCESS_TOKEN }}
+
+      - name: Run affected tests
+        run: npx nx affected -t test --parallel=3 --ci --coverage --watchAll=false
+        env:
+          NX_CLOUD_ACCESS_TOKEN: ${{ secrets.NX_CLOUD_ACCESS_TOKEN }}
+
+      - name: Run affected builds
+        run: npx nx affected -t build --parallel=3
+        env:
+          NX_CLOUD_ACCESS_TOKEN: ${{ secrets.NX_CLOUD_ACCESS_TOKEN }}
+
+      # Upload build artifacts
+      - name: Upload build artifacts
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts-${{ github.sha }}
+          path: |
+            apps/demo-app/dist/
+          retention-days: 7
+
+      # Show build cache demo (local demonstration)
+      - name: Build Cache Demo
+        if: success()
+        run: |
+          echo "## 🚀 Nx Build Cache Demo with Nx Cloud"
+          echo "Testing build caching behavior..."
+
+          echo "First build (checking Nx Cloud cache):"
+          time npx nx build demo-app
+
+          echo "Second build (should hit local cache):"
+          time npx nx build demo-app
+        env:
+          NX_CLOUD_ACCESS_TOKEN: ${{ secrets.NX_CLOUD_ACCESS_TOKEN }}
+
+      # Show final build stats
+      - name: Build Summary
+        if: always()
+        run: |
+          echo "## Build Summary 📊" >> $GITHUB_STEP_SUMMARY
+          echo "- Node.js: $(node --version)" >> $GITHUB_STEP_SUMMARY
+          echo "- Yarn: $(yarn --version)" >> $GITHUB_STEP_SUMMARY
+          echo "- Nx: $(npx nx --version)" >> $GITHUB_STEP_SUMMARY
+          if [ -d "apps/demo-app/dist" ]; then
+            echo "- Build size: $(du -sh apps/demo-app/dist | cut -f1)" >> $GITHUB_STEP_SUMMARY
+            echo "- Asset files: $(find apps/demo-app/dist/assets -type f | wc -l)" >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "- Nx Cache: $(du -sh .nx/cache 2>/dev/null || echo 'No local cache')" >> $GITHUB_STEP_SUMMARY
+          echo "- Vite Cache: $(du -sh node_modules/.vite 2>/dev/null || echo 'No Vite cache')" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Cache Performance 🚀" >> $GITHUB_STEP_SUMMARY
+          echo "- **Nx Cloud**: Distributed build output caching" >> $GITHUB_STEP_SUMMARY
+          echo "- **GitHub Actions**: Vite dependency caching" >> $GITHUB_STEP_SUMMARY
+          echo "- **Combined**: Maximum build speed optimization!" >> $GITHUB_STEP_SUMMARY
+
+      - name: Nx workspace cleanup
+        run: npx nx fix-ci
+        if: always()
+        env:
+          NX_CLOUD_ACCESS_TOKEN: ${{ secrets.NX_CLOUD_ACCESS_TOKEN }}
