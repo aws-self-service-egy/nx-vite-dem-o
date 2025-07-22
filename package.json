@@ -1,0 +1,37 @@
+{
+  "name": "nx-vite-demo",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "nx serve demo-app",
+    "build": "nx build demo-app",
+    "preview": "nx preview demo-app",
+    "test": "nx test demo-app",
+    "lint": "nx lint demo-app"
+  },
+  "dependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.15.0",
+    "@nx/eslint": "21.3.2",
+    "@nx/vite": "21.3.2",
+    "@nx/workspace": "21.3.2",
+    "@types/react": "^18.2.43",
+    "@types/react-dom": "^18.2.17",
+    "@typescript-eslint/eslint-plugin": "^8.15.0",
+    "@typescript-eslint/parser": "^8.15.0",
+    "@vitejs/plugin-react": "^4.2.1",
+    "eslint": "^9.15.0",
+    "eslint-plugin-react-hooks": "^5.0.0",
+    "eslint-plugin-react-refresh": "^0.4.14",
+    "globals": "^15.12.0",
+    "nx": "21.3.2",
+    "typescript": "~5.6.2",
+    "vite": "^5.1.4",
+    "vitest": "^2.1.8"
+  },
+  "nx": {}
+}
