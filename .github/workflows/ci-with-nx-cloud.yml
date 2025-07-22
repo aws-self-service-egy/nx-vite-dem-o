@@ -28,6 +28,20 @@ jobs:
       - name: Install dependencies
         run: yarn install --frozen-lockfile
 
+      # Cache Vite build dependencies (complementary to Nx Cloud)
+      - name: Cache Vite Build Dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            node_modules/.vite
+            node_modules/.cache/esbuild
+            .nx/cache
+            apps/demo-app/node_modules/.vite
+          key: vite-deps-${{ runner.os }}-${{ hashFiles('**/vite.config.*') }}-${{ hashFiles('**/package.json') }}
+          restore-keys: |
+            vite-deps-${{ runner.os }}-${{ hashFiles('**/vite.config.*') }}-
+            vite-deps-${{ runner.os }}-
+
       # Set up Nx SHAs for affected command
       - name: Set Nx SHAs
         uses: nrwl/nx-set-shas@v4
@@ -85,7 +99,13 @@ jobs:
             echo "- Build size: $(du -sh apps/demo-app/dist | cut -f1)" >> $GITHUB_STEP_SUMMARY
             echo "- Asset files: $(find apps/demo-app/dist/assets -type f | wc -l)" >> $GITHUB_STEP_SUMMARY
           fi
-          echo "- Local Cache: $(du -sh .nx/cache 2>/dev/null || echo 'No local cache')" >> $GITHUB_STEP_SUMMARY
+          echo "- Nx Cache: $(du -sh .nx/cache 2>/dev/null || echo 'No local cache')" >> $GITHUB_STEP_SUMMARY
+          echo "- Vite Cache: $(du -sh node_modules/.vite 2>/dev/null || echo 'No Vite cache')" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Cache Performance 🚀" >> $GITHUB_STEP_SUMMARY
+          echo "- **Nx Cloud**: Distributed build output caching" >> $GITHUB_STEP_SUMMARY
+          echo "- **GitHub Actions**: Vite dependency caching" >> $GITHUB_STEP_SUMMARY
+          echo "- **Combined**: Maximum build speed optimization!" >> $GITHUB_STEP_SUMMARY
 
       - name: Nx workspace cleanup
         run: npx nx fix-ci
