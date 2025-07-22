@@ -140,6 +140,24 @@ aws s3 sync apps/demo-app/dist/ s3://your-bucket-name --delete
 - `nx reset` - Clear Nx cache (for testing cache behavior)
 - `nx graph` - View project dependency graph
 
+## 🚀 CI/CD Workflows
+
+This project includes **two caching strategies** to demonstrate different optimization approaches:
+
+### **1. Nx Cloud Workflow** (`.github/workflows/ci-with-nx-cloud.yml`)
+- 🌐 **Distributed caching** with Nx Cloud
+- ⚡ **Team-wide cache sharing**
+- 📊 **Advanced analytics and insights**
+- 🎯 **Best for production teams**
+
+### **2. Local Cache Workflow** (`.github/workflows/ci-local-cache-only.yml`)  
+- 🔧 **GitHub Actions caching only**
+- 🏠 **No external dependencies**
+- 💰 **Zero additional costs**
+- 🧪 **Perfect for learning/solo projects**
+
+See **[CACHE-COMPARISON.md](./CACHE-COMPARISON.md)** for detailed performance analysis!
+
 ## 📈 Monitoring Cache Performance
 
 ### View Cache Statistics:
