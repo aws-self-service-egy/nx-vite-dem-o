@@ -1,0 +1,158 @@
+name: CI - Local Cache Only (No Nx Cloud)
+
+on:
+  workflow_dispatch: # Manual trigger for testing
+  push:
+    branches:
+      - feature/local-cache-demo  # Separate branch for testing
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  local-cache-demo:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: "yarn"
+
+      # Multi-layer GitHub Actions caching
+      - name: Cache Nx Local Cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            .nx/cache
+          key: nx-local-${{ runner.os }}-${{ hashFiles('nx.json') }}-${{ hashFiles('**/project.json') }}-${{ hashFiles('**/*.{ts,tsx,js,jsx,json}') }}
+          restore-keys: |
+            nx-local-${{ runner.os }}-${{ hashFiles('nx.json') }}-${{ hashFiles('**/project.json') }}-
+            nx-local-${{ runner.os }}-${{ hashFiles('nx.json') }}-
+            nx-local-${{ runner.os }}-
+
+      - name: Cache Vite Dependencies  
+        uses: actions/cache@v4
+        with:
+          path: |
+            node_modules/.vite
+            apps/demo-app/node_modules/.vite
+            node_modules/.cache/esbuild
+            node_modules/.cache/@babel
+          key: vite-local-${{ runner.os }}-${{ hashFiles('**/vite.config.*') }}-${{ hashFiles('**/package.json') }}
+          restore-keys: |
+            vite-local-${{ runner.os }}-${{ hashFiles('**/vite.config.*') }}-
+            vite-local-${{ runner.os }}-
+
+      - name: Cache TypeScript Build Info
+        uses: actions/cache@v4
+        with:
+          path: |
+            **/*.tsbuildinfo
+            **/tsconfig.tsbuildinfo
+          key: ts-build-${{ runner.os }}-${{ hashFiles('**/tsconfig*.json') }}-${{ hashFiles('**/*.{ts,tsx}') }}
+          restore-keys: |
+            ts-build-${{ runner.os }}-${{ hashFiles('**/tsconfig*.json') }}-
+            ts-build-${{ runner.os }}-
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+
+      # Set up Nx SHAs but disable Nx Cloud
+      - name: Set Nx SHAs (Local Only)
+        uses: nrwl/nx-set-shas@v4
+        env:
+          NX_CLOUD_ACCESS_TOKEN: "" # Explicitly disable Nx Cloud
+
+      # Run commands with local caching only
+      - name: Run affected lint (Local Cache)
+        run: npx nx affected -t lint --parallel=3 --skip-nx-cloud
+        env:
+          NX_CLOUD_ACCESS_TOKEN: ""
+
+      - name: Run affected tests (Local Cache)
+        run: npx nx affected -t test --parallel=3 --ci --coverage --watchAll=false --skip-nx-cloud
+        env:
+          NX_CLOUD_ACCESS_TOKEN: ""
+
+      - name: Run affected builds (Local Cache) 
+        run: npx nx affected -t build --parallel=3 --skip-nx-cloud
+        env:
+          NX_CLOUD_ACCESS_TOKEN: ""
+
+      # Demonstrate local caching behavior
+      - name: Local Cache Demo
+        if: success()
+        run: |
+          echo "## 🔧 Local Nx + GitHub Actions Cache Demo"
+          echo "Testing pure local caching behavior..."
+          
+          echo "=== First build (potential cache hit from GitHub Actions) ==="
+          time npx nx build demo-app --skip-nx-cloud
+          
+          echo "=== Second build (should hit local Nx cache) ==="
+          time npx nx build demo-app --skip-nx-cloud
+          
+          echo "=== Third build (should be instant local cache) ==="
+          time npx nx build demo-app --skip-nx-cloud
+        env:
+          NX_CLOUD_ACCESS_TOKEN: ""
+
+      # Show cache statistics
+      - name: Cache Analysis
+        if: always()
+        run: |
+          echo "### 📊 Cache Statistics" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [ -d ".nx/cache" ]; then
+            echo "**Nx Local Cache:**" >> $GITHUB_STEP_SUMMARY
+            echo "- Size: $(du -sh .nx/cache | cut -f1)" >> $GITHUB_STEP_SUMMARY
+            echo "- Files: $(find .nx/cache -type f | wc -l)" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "**Nx Local Cache:** Not found" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          if [ -d "node_modules/.vite" ]; then
+            echo "**Vite Cache:**" >> $GITHUB_STEP_SUMMARY  
+            echo "- Size: $(du -sh node_modules/.vite | cut -f1)" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "**Vite Cache:** Not found" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          if [ -d "apps/demo-app/dist" ]; then
+            echo "**Build Output:**" >> $GITHUB_STEP_SUMMARY
+            echo "- Size: $(du -sh apps/demo-app/dist | cut -f1)" >> $GITHUB_STEP_SUMMARY
+            echo "- Assets: $(find apps/demo-app/dist/assets -type f 2>/dev/null | wc -l)" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🏗️ Caching Strategy" >> $GITHUB_STEP_SUMMARY
+          echo "This workflow uses **only local caching**:" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ **Nx Local Cache** - Build output caching within CI run" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ **GitHub Actions Cache** - Persistent across CI runs" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ **Vite Internal Cache** - Faster compilation" >> $GITHUB_STEP_SUMMARY
+          echo "- ❌ **Nx Cloud** - Disabled for this demo" >> $GITHUB_STEP_SUMMARY
+
+      # Upload build artifacts
+      - name: Upload Build Artifacts (Local Cache Demo)
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: local-cache-build-${{ github.sha }}
+          path: |
+            apps/demo-app/dist/
+            .nx/cache/
+          retention-days: 3
+
+      - name: Nx workspace cleanup
+        run: npx nx fix-ci
+        if: always()
+        env:
+          NX_CLOUD_ACCESS_TOKEN: ""
