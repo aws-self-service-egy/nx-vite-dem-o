@@ -32,31 +32,21 @@ jobs:
       - name: Set Nx SHAs
         uses: nrwl/nx-set-shas@v4
 
-      # Start Nx Cloud CI run (optional - requires Nx Cloud setup)
-      - name: Start CI run
-        run: npx nx-cloud start-ci-run --stop-agents-after="build" --agent-count=3
-        continue-on-error: true
-
-      # Run affected commands with better error handling
+      # Run affected commands with Nx Cloud
       - name: Run affected lint
         run: npx nx affected -t lint --parallel=3
-        continue-on-error: false
+        env:
+          NX_CLOUD_ACCESS_TOKEN: ${{ secrets.NX_CLOUD_ACCESS_TOKEN }}
 
       - name: Run affected tests
         run: npx nx affected -t test --parallel=3 --ci --coverage --watchAll=false
-        continue-on-error: false
+        env:
+          NX_CLOUD_ACCESS_TOKEN: ${{ secrets.NX_CLOUD_ACCESS_TOKEN }}
 
       - name: Run affected builds
         run: npx nx affected -t build --parallel=3
-
-      # Generate and upload coverage reports (if using vitest with coverage)
-      - name: Upload coverage reports to Codecov
-        if: success()
-        uses: codecov/codecov-action@v4
-        with:
-          directory: ./coverage
-          fail_ci_if_error: false
-        continue-on-error: true
+        env:
+          NX_CLOUD_ACCESS_TOKEN: ${{ secrets.NX_CLOUD_ACCESS_TOKEN }}
 
       # Upload build artifacts
       - name: Upload build artifacts
@@ -66,8 +56,22 @@ jobs:
           name: build-artifacts-${{ github.sha }}
           path: |
             apps/demo-app/dist/
-            .nx/cache/
           retention-days: 7
+
+      # Show build cache demo (local demonstration)
+      - name: Build Cache Demo
+        if: success() && github.ref == 'refs/heads/main'
+        run: |
+          echo "## 🚀 Nx Build Cache Demo with Nx Cloud"
+          echo "Testing build caching behavior..."
+
+          echo "First build (checking Nx Cloud cache):"
+          time npx nx build demo-app
+
+          echo "Second build (should hit local cache):"
+          time npx nx build demo-app
+        env:
+          NX_CLOUD_ACCESS_TOKEN: ${{ secrets.NX_CLOUD_ACCESS_TOKEN }}
 
       # Show final build stats
       - name: Build Summary
@@ -81,8 +85,11 @@ jobs:
             echo "- Build size: $(du -sh apps/demo-app/dist | cut -f1)" >> $GITHUB_STEP_SUMMARY
             echo "- Asset files: $(find apps/demo-app/dist/assets -type f | wc -l)" >> $GITHUB_STEP_SUMMARY
           fi
+          echo "- Local Cache: $(du -sh .nx/cache 2>/dev/null || echo 'No local cache')" >> $GITHUB_STEP_SUMMARY
 
       - name: Nx workspace cleanup
         run: npx nx fix-ci
         if: always()
+        env:
+          NX_CLOUD_ACCESS_TOKEN: ${{ secrets.NX_CLOUD_ACCESS_TOKEN }}
 
